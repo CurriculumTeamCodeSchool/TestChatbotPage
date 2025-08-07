@@ -1,205 +1,163 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>PyScript CLI-Style Chatbot</title>
-<link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
-<script defer src="https://pyscript.net/releases/2023.11.1/pyscript.js"></script>
-<link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/pyscript.css" />
-<style>
-    body {
-        font-family: monospace, monospace;
-        max-width: 700px;
-        margin: auto;
-        padding: 1rem;
-        background: black;
-        color: #33ff33;
-    }
-    #output {
-        background: black;
-        color: #33ff33;
-        height: 400px;
-        overflow-y: scroll;
-        padding: 1rem;
-        border: 2px solid #33ff33;
-        white-space: pre-wrap;
-    }
-    #user-input {
-        width: 100%;
-        font-family: monospace;
-        font-size: 1rem;
-        background: black;
-        color: #33ff33;
-        border: 2px solid #33ff33;
-        padding: 0.5rem;
-    }
-</style>
+  <meta charset="UTF-8">
+  <title>Python Chatbot (Command Line Style)</title>
+  <link rel="stylesheet" href="https://pyscript.net/releases/2023.11.1/pyscript.css" />
+  <script defer src="https://pyscript.net/releases/2023.11.1/pyscript.js"></script>
+  <style>
+    body { background: black; color: #33ff33; font-family: monospace; padding: 20px; }
+    #output { border: 2px solid #33ff33; height: 400px; overflow-y: scroll; padding: 10px; white-space: pre-wrap; }
+    #user-input { width: 100%; padding: 8px; background: black; color: #33ff33; border: 2px solid #33ff33; font-family: monospace; }
+    h1 { color: #33ff33; }
+  </style>
 </head>
 <body>
 
-<h2>Python Chatbot (Command Line Style)</h2>
+<h1>Python Chatbot (Command Line Style)</h1>
 <div id="output"></div>
-<input id="user-input" type="text" autocomplete="off" placeholder="Type your answer here" autofocus />
+<input id="user-input" type="text" placeholder="Type here and press Enter" autofocus>
 
 <py-script>
 from js import document
 from datetime import date
 from collections import Counter
+from pyodide.ffi import create_proxy
 
 output = document.getElementById("output")
 user_input = document.getElementById("user-input")
 
-list_of_students_age = []
-dictionary_colours = {}
-days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-days_in_a_month = {"January": 31, "February": 28}
-
-current_step = 0
-temp_name = ""
-temp_age = None
-temp_colour = ""
-temp_shape_answer = ""
-
+# Original chatbot logic functions
 def CalculateAge(birthday):
     parts = birthday.split('/')
     if len(parts) != 3:
         return None
     try:
-        day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
+        d, m, y = map(int, parts)
     except:
         return None
     today = date.today()
-    age = today.year - year
-    if (today.month, today.day) < (month, day):
-        age -= 1
+    age = today.year - y - ((today.month, today.day) < (m, d))
     return age
 
 def DrawDiamond():
     lines = []
-    height = 4
-    for i in range(height):
-        lines.append(" " * (height - i) + "*" * (i * 2 + 1))
-    for i in range(1, height):
-        lines.append(" " * (i + 1) + "*" * (2 * height - i * 2 - 1))
+    h = 4
+    for i in range(h):
+        lines.append(" "*(h-i) + "*"*(i*2+1))
+    for i in range(1, h):
+        lines.append(" "*(i+1) + "*"*(2*h - i*2 -1))
     return "\n".join(lines)
 
-def append_output(text):
-    output.innerHTML += text + "\n"
+# Conversation state
+ages = []
+colours = {}
+current_step = 0
+temp_name = ""
+temp_age = None
+
+def append_output(txt):
+    output.innerHTML += txt + "\n"
     output.scrollTop = output.scrollHeight
 
-def prompt(text):
-    append_output(text)
-
 def process_input(ans):
-    global current_step, temp_name, temp_age, temp_colour, temp_shape_answer
-
-    # Echo user input in terminal style
+    global current_step, temp_name, temp_age
+    ans = ans.strip()
     append_output("> " + ans)
 
-    if current_step == 0:  # ask name
-        if len(ans) < 2 or len(ans) > 10:
-            prompt("Haha nice try with the name! Let's enter the correct name")
+    # step 0: name
+    if current_step == 0:
+        if len(ans)<2 or len(ans)>10:
+            append_output("Haha nice try with the name! Let's enter the correct name")
             return
         temp_name = ans
-        prompt(f"Welcome to Python {temp_name}!")
-        prompt("Let's calculate your age from your date of birth!! What is your date of birth? Write in this format: DD/MM/YYYY")
+        append_output(f"Welcome to Python {temp_name}!")
+        append_output("Let's calculate your age from your date of birth!! What is your date of birth? Write in this format: DD/MM/YYYY")
         current_step = 1
 
-    elif current_step == 1:  # ask birthday
+    # step1: birthday
+    elif current_step == 1:
         age = CalculateAge(ans)
-        if age is None or age < 0 or age > 150:
-            prompt("That doesn't seem like a valid date. Please enter DOB in DD/MM/YYYY format.")
+        if age is None or age<0 or age>150:
+            append_output("That doesn't seem like a valid date. Please enter DOB in DD/MM/YYYY format.")
             return
         temp_age = age
-        list_of_students_age.append(age)
-        prompt(f"Your age is {age}!")
+        ages.append(age)
+        append_output(f"Your age is {age}!")
         if age > 40:
-            prompt("Oh wow! You are quite old!")
-        prompt("Lets talk about colours! What colour is your favourite?")
+            append_output("Oh wow! You are quite old!")
+        append_output("Lets talk about colours! What colour is your favourite?")
         current_step = 2
 
-    elif current_step == 2:  # ask favourite colour
-        temp_colour = ans
-        dictionary_colours[temp_name] = temp_colour
-        prompt(f"{temp_colour} is an amazing colour!")
-        prompt("Do you prefer rectangles or diamonds? Type the name of the shape that you prefer")
+    # step2: colour
+    elif current_step == 2:
+        colours[temp_name] = ans
+        append_output(f"{ans} is an amazing colour!")
+        append_output("Do you prefer rectangles or diamonds? Type the name of the shape that you prefer")
         current_step = 3
 
-    elif current_step == 3:  # ask shape preference
-        a = ans.lower()
-        if a == "diamond":
-            prompt(DrawDiamond())
-            prompt("Is there anyone else who wants to answer these questions? (yes/no)")
-            current_step = 4
-        elif a == "rectangle":
-            height = 5
-            rect = "\n".join(["*" * height for _ in range(height)])
-            prompt(rect)
-            prompt("Is there anyone else who wants to answer these questions? (yes/no)")
-            current_step = 4
+    # step3: shape
+    elif current_step == 3:
+        choice = ans.lower()
+        if choice == "diamond":
+            append_output(DrawDiamond())
+        elif choice == "rectangle":
+            rect = "\n".join(["*"*5]*5)
+            append_output(rect)
         else:
-            prompt("Oops! I can only make a rectangle or a diamond. Type the name of the shape that you would prefer")
+            append_output("Oops! I can only make a rectangle or a diamond. Type the name of the shape that you would prefer")
+            return
+        append_output("Is there anyone else who wants to answer these questions? (yes/no)")
+        current_step = 4
 
-    elif current_step == 4:  # ask if another student
+    # step4: more students?
+    elif current_step == 4:
         if ans.lower() == "yes":
-            prompt("\nFirst Question! What is your name?")
+            append_output("\nFirst Question! What is your name?")
             current_step = 0
         elif ans.lower() == "no":
-            prompt("Do you want to know the oldest and youngest age in this class? (yes/no)")
+            append_output("Do you want to know the oldest and youngest age in this class? (yes/no)")
             current_step = 5
         else:
-            prompt("Please answer with yes or no.")
+            append_output("Please answer with yes or no.")
+            return
 
-    elif current_step == 5:  # ask oldest youngest
+    # step5: show max/min?
+    elif current_step == 5:
         if ans.lower() == "yes":
-            maximum_age = max(list_of_students_age)
-            minimum_age = min(list_of_students_age)
-            prompt("Let's see what was the maximum and minimum age in the class")
-            prompt(f"The maximum age was {maximum_age}")
-            prompt(f"The minimum age was {minimum_age}")
-            days_of_week.append("Saturday")
-            days_of_week.append("Sunday")
-            days_in_a_month["March"] = 31
-            prompt("Do you want me to make a bar chart of everyone's ages? (yes/no)")
-            current_step = 6
-        elif ans.lower() == "no":
-            prompt("Alright let's move on!")
-            days_of_week.append("Saturday")
-            days_of_week.append("Sunday")
-            days_in_a_month["March"] = 31
-            prompt("Do you want me to make a bar chart of everyone's ages? (yes/no)")
-            current_step = 6
+            append_output("Let's see what was the maximum and minimum age in the class")
+            append_output(f"The maximum age was {max(ages)}")
+            append_output(f"The minimum age was {min(ages)}")
         else:
-            prompt("Please answer yes or no.")
+            append_output("Alright let's move on!")
+        current_step = 6
+        append_output("Before we finish, let's update days/weeks and months...")
+        append_output("Do you want me to make a bar chart of everyone's ages? (yes/no)")
 
-    elif current_step == 6:  # bar chart question
+    # step6: bar chart question
+    elif current_step == 6:
         if ans.lower() == "yes":
-            prompt("\nDrawing bar chart of ages... (Not implemented in this demo)\n")
-            prompt("Okay that's it for us :( Thank you for chatting! See you next time!")
-            current_step = 7
-        elif ans.lower() == "no":
-            prompt("Okay that's it for us :( Thank you for chatting! See you next time!")
-            current_step = 7
-        else:
-            prompt("Please answer yes or no.")
+            append_output("\n(Bar chart drawing not supported in CLI view.)\n")
+        append_output("Okay that's it for us :( Thank you for chatting! See you next time!")
+        current_step = 7
 
     elif current_step == 7:
-        # conversation ended
-        prompt("The chat has ended. Refresh the page to start again.")
+        append_output("The chat has ended. Refresh to start again.")
         user_input.disabled = True
 
-# Start
-prompt("Hello! I am a Python Chatbot and I am going to ask you some questions! (ﾉ◕ヮ◕)ﾉ*:・ﾟ✧\n")
-prompt("First Question! What is your name?")
+# start conversation
+append_output("Hello! I am a Python Chatbot and I am going to ask you some questions! (ﾉ◕ヮ◕)ﾉ*:・ﾟ✧")
+append_output("First Question! What is your name?")
 
-def on_enter(e):
-    if e.key == "Enter":
-        val = user_input.value.strip()
-        if val != "":
-            process_input(val)
-            user_input.value = ""
+def handle_key(event):
+    if event.key == "Enter":
+        event.preventDefault()
+        val = user_input.value
+        user_input.value = ""
+        process_input(val)
 
-user_input.addEventListener("keypress", on_enter)
+key_proxy = create_proxy(handle_key)
+user_input.addEventListener("keypress", key_proxy)
 </py-script>
 
 </body>
